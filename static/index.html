@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema CDP · Panel</title>
+<style>html, body { margin: 0; background: #0b1329; }</style>
+</head>
+<body>
+<style>
+  .dash { background:#0b1329; color:#e2e8f0; padding:28px; font-family:system-ui,-apple-system,sans-serif; min-height:100vh; box-sizing:border-box; }
+  .dash h2 { margin:0; font-size:1.5rem; }
+  .dash .sub { color:#94a3b8; font-size:0.85rem; margin-top:4px; }
+  .dash-head { display:flex; justify-content:space-between; align-items:center; gap:12px; border-bottom:1px solid #1e293b; padding-bottom:16px; margin-bottom:22px; }
+  .chip-ok { background:rgba(34,197,94,.15); color:#4ade80; border:1px solid #22c55e; padding:4px 10px; border-radius:6px; font-size:.7rem; font-weight:700; white-space:nowrap; }
+  .grid { display:grid; gap:14px; margin-bottom:20px; }
+  .g-kpi { grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); }
+  .g-2   { grid-template-columns:1fr 1fr; }
+  .g-map { grid-template-columns:2fr 1fr; }
+  @media(max-width:900px){ .g-2,.g-map{ grid-template-columns:1fr; } }
+  .card { background:#131f37; border:1px solid #233554; border-radius:12px; padding:16px 18px; }
+  .card .t { font-size:.72rem; font-weight:700; color:#94a3b8; text-transform:uppercase; }
+  .card .v { font-size:1.9rem; font-weight:800; color:#38bdf8; margin:6px 0 2px; }
+  .card .s { font-size:.72rem; color:#64748b; }
+  .v.rojo { color:#f87171; } .v.amar { color:#fbbf24; }
+  .acc3 { display:flex; gap:14px; margin-top:8px; font-size:.8rem; }
+  .acc3 b { font-size:1.4rem; display:block; }
+  .box-title { font-size:1rem; font-weight:700; margin:0 0 6px; }
+  .box-desc { color:#94a3b8; font-size:.8rem; margin:0 0 14px; line-height:1.4; }
+  .tech { display:block; color:#64748b; font-size:.68rem; font-family:monospace; margin-top:8px; }
+  .btn { background:#0284c7; color:#fff; font-weight:700; padding:11px 18px; border-radius:8px; border:none; cursor:pointer; font-size:.88rem; }
+  .btn:hover { background:#0369a1; } .btn.alt { background:#6366f1; } .btn.alt:hover { background:#4f46e5; }
+  .btn:disabled { opacity:.6; cursor:wait; }
+  .inp { width:90px; padding:10px; border-radius:8px; background:#0b1329; border:1px solid #334155; color:#fff; margin-right:8px; }
+  .pda-link { display:flex; justify-content:space-between; align-items:center; text-decoration:none; color:#e2e8f0; background:#131f37; border:1px solid #38bdf8; border-radius:12px; padding:16px 20px; margin-bottom:20px; }
+  .pda-link:hover { background:#1a2a48; } .pda-link small { color:#94a3b8; display:block; margin-top:3px; }
+  .term { background:#030712; border:1px solid #1e293b; border-radius:10px; padding:12px 16px; font-family:monospace; font-size:.85rem; color:#38bdf8; min-height:40px; margin-bottom:20px; }
+  #mapa_cuarteles { height:430px; border-radius:10px; background:#0f172a; }
+  .leyenda { display:flex; flex-wrap:wrap; gap:12px; margin-top:10px; font-size:.75rem; color:#cbd5e1; }
+  .leyenda i { display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+  .tbl { width:100%; border-collapse:collapse; font-size:.8rem; }
+  .tbl th { text-align:left; color:#94a3b8; font-size:.7rem; text-transform:uppercase; padding:7px 9px; border-bottom:1px solid #233554; }
+  .tbl td { padding:8px 9px; border-bottom:1px solid #1e293b; vertical-align:top; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:.68rem; font-weight:700; border:1px solid currentColor; }
+  .vacio { color:#64748b; font-size:.82rem; padding:8px 0; }
+  .leaflet-popup-content { color:#0b1329; font-size:.8rem; }
+</style>
+
+<div class="dash">
+  <div class="dash-head">
+    <div>
+      <h2>Sistema Estratégico de Reparto Postal</h2>
+      <div class="sub">Monitoreo de cuarteles, capacidad y clientes B2B (Valparaíso)</div>
+    </div>
+    <span class="chip-ok">CONECTADO A MONGODB ATLAS</span>
+  </div>
+
+  <a class="pda-link" href="/pda.html">
+    <span><b>📲 Terminal de terreno (PDA)</b><small>Registro de visitas de los carteros mediante FastAPI y almacenamiento NoSQL.</small></span>
+    <span style="font-size:1.4rem;">→</span>
+  </a>
+
+  <a class="pda-link" href="/explicacion.html" style="border-color:#4ade80;">
+    <span><b>📖 De PL/SQL a MongoDB</b><small>Arquitectura, modelo y agregaciones.</small></span>
+    <span style="font-size:1.4rem;">→</span>
+  </a>
+
+  <div class="grid g-kpi">
+    <div class="card"><div class="t">Envíos pendientes</div><div class="v" id="kpi_pend">-</div><div class="s">En todos los cuarteles</div></div>
+    <div class="card"><div class="t">Cuarteles sobrecargados hoy</div><div class="v rojo" id="kpi_sobre">-</div><div class="s" id="kpi_limite">Límite operativo</div></div>
+    <div class="card"><div class="t">Acción sugerida (diagnóstico)</div>
+      <div class="acc3">
+        <div style="color:#38bdf8"><b id="kpi_mot">-</b>motorizar</div>
+        <div style="color:#f87171"><b id="kpi_sub">-</b>subdividir</div>
+        <div style="color:#a78bfa"><b id="kpi_fus">-</b>fusionar</div>
+      </div>
+    </div>
+    <div class="card"><div class="t">Oportunidades B2B</div><div class="v" id="kpi_opo">-</div><div class="s">Empresas detectadas</div></div>
+    <div class="card"><div class="t">Envíos devueltos</div><div class="v amar" id="kpi_dev">-</div><div class="s">Tras múltiples intentos</div></div>
+  </div>
+
+  <div class="grid g-2">
+    <div class="card">
+      <p class="box-title">Actualizar diagnóstico de cuarteles</p>
+      <p class="box-desc">Analiza el estado de los cuarteles mediante agregaciones en MongoDB para sugerir la mejor estrategia operativa.</p>
+      <button type="button" class="btn" id="btn_diag" onclick="ejecutarDiagnostico(event)">⚡ Actualizar diagnóstico</button>
+      <span class="tech">FastAPI + MongoDB Aggregate Pipeline</span>
+    </div>
+    <div class="card">
+      <p class="box-title">Buscar oportunidades B2B</p>
+      <p class="box-desc">Detecta clientes corporativos cuyo volumen mensual supera el umbral configurado.</p>
+      <input type="number" class="inp" id="val_umbral" value="100" min="0"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();}">
+      <button type="button" class="btn alt" id="btn_opo" onclick="ejecutarOportunidades(event)">🔍 Buscar con este umbral</button>
+      <span class="tech">FastAPI B2B Query Service</span>
+    </div>
+  </div>
+
+  <div class="term" id="term_status">[MongoDB Atlas]: esperando ejecución de consultas API...</div>
+
+  <div class="grid g-map">
+    <div class="card">
+      <p class="box-title">Mapa de cuarteles por acción sugerida</p>
+      <div id="mapa_cuarteles"></div>
+      <div class="leyenda">
+        <span><i style="background:#f87171"></i>Subdividir</span>
+        <span><i style="background:#38bdf8"></i>Motorizar</span>
+        <span><i style="background:#a78bfa"></i>Fusionar</span>
+        <span><i style="background:#4ade80"></i>Mantener</span>
+        <span><i style="background:#64748b"></i>Sin datos</span>
+      </div>
+    </div>
+    <div class="card">
+      <p class="box-title">Alertas de sobrecarga actual</p>
+      <p class="box-desc">Cuarteles operando sobre los límites establecidos.</p>
+      <div id="res_alertas"><div class="vacio">Cargando...</div></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;"><div id="res_diag"><div class="vacio">Presiona "Actualizar diagnóstico" para ver las acciones recomendadas por el sistema NoSQL.</div></div></div>
+  <div class="card"><div id="res_opo"><div class="vacio">Los clientes corporativos detectados aparecerán aquí.</div></div></div>
+</div>
+
+<script src="/api.js"></script>
+<script>
+  var COLORES = { SUBDIVIDIR:'#f87171', MOTORIZAR:'#38bdf8', FUSIONAR:'#a78bfa', MANTENER:'#4ade80' };
+  var mapa = null, capaMarcadores = null;
+
+  function esc(t) {
+    return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function term(txt, color) {
+    var t = document.getElementById('term_status');
+    if (t) { t.innerHTML = txt; t.style.color = color; }
+  }
+  function setT(id, v) { var e = document.getElementById(id); if (e) { e.innerHTML = v; } }
+
+  function cargarKpis() {
+    llamar('KPIS', {}, function (p) {
+      setT('kpi_pend', p.pendientes);
+      setT('kpi_sobre', p.sobrecargados_hoy);
+      setT('kpi_limite', 'Límite operativo: ' + (p.limite_g / 1000).toFixed(0) + ' kg');
+      setT('kpi_mot', p.hay_diagnostico ? p.motorizar : '-');
+      setT('kpi_sub', p.hay_diagnostico ? p.subdividir : '-');
+      setT('kpi_fus', p.hay_diagnostico ? p.fusionar : '-');
+      setT('kpi_opo', p.oportunidades);
+      setT('kpi_dev', p.devueltos);
+    }, function (m) { term('✖ Indicadores: ' + esc(m), '#f87171'); });
+  }
+
+  function cargarAlertas() {
+    llamar('ALERTAS', {}, function (p) {
+      var f = p.filas || [], c = document.getElementById('res_alertas');
+      if (!f.length) { c.innerHTML = '<div class="vacio">Sin alertas de sobrecarga activas.</div>'; return; }
+      var h = '<table class="tbl"><thead><tr><th>Cuartel</th><th>Carga</th><th>Días</th><th>Acción</th></tr></thead><tbody>';
+      f.forEach(function (r) {
+        var col = COLORES[r.accion] || '#94a3b8';
+        h += '<tr><td><b>' + esc(r.cuartel) + '</b></td><td style="color:#f87171">' + (r.peso_g / 1000).toFixed(1) + ' kg</td>' +
+             '<td>' + esc(r.dias) + '</td><td><span class="pill" style="color:' + col + '">' + esc(r.accion) + '</span></td></tr>';
+      });
+      c.innerHTML = h + '</tbody></table>';
+    }, function (m) { document.getElementById('res_alertas').innerHTML = '<div class="vacio">✖ ' + esc(m) + '</div>'; });
+  }
+
+  function cargarLeaflet(cb) {
+    if (window.L) { cb(); return; }
+    var l = document.createElement('link'); l.rel = 'stylesheet';
+    l.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(l);
+    var s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = cb;
+    s.onerror = function () { setT('mapa_cuarteles', '<div class="vacio" style="padding:20px">No se pudo cargar el mapa.</div>'); };
+    document.head.appendChild(s);
+  }
+
+  function cargarMapa() {
+    cargarLeaflet(function () {
+      llamar('MAPA', {}, function (p) {
+        if (!mapa) {
+          mapa = L.map('mapa_cuarteles').setView([-33.07, -71.60], 12);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(mapa);
+          capaMarcadores = L.layerGroup().addTo(mapa);
+        }
+        capaMarcadores.clearLayers();
+        var pts = [];
+        (p.filas || []).forEach(function (f) {
+          var col = COLORES[f.accion] || '#64748b';
+          var pop = '<b>Cuartel ' + esc(f.cuartel) + '</b><br>' + esc(f.tipo) + ' · ' + esc(f.dificultad) +
+                    (f.accion ? '<br><b>' + esc(f.accion) + '</b>' + (f.demanda != null ? ' (demanda ' + esc(f.demanda) + '%)' : '') +
+                    '<br>' + esc(f.motivo) : '<br>Sin diagnóstico');
+          L.circleMarker([f.lat, f.lon], { radius: 9, color: '#0b1329', weight: 1.5, fillColor: col, fillOpacity: 0.9 })
+            .bindPopup(pop).addTo(capaMarcadores);
+          pts.push([f.lat, f.lon]);
+        });
+        if (pts.length) { mapa.fitBounds(pts, { padding: [25, 25] }); }
+        setTimeout(function () { mapa.invalidateSize(); }, 300);
+      }, function (m) { setT('mapa_cuarteles', '<div class="vacio" style="padding:20px">✖ ' + esc(m) + '</div>'); });
+    });
+  }
+
+  function renderDiagnostico(f) {
+    var h = '<p class="box-title">Acción sugerida por cuartel (MongoDB)</p><table class="tbl"><thead><tr><th>Cuartel</th><th>Tipo</th><th>Peso Pendiente</th><th>Demanda</th><th>Días</th><th>Acción</th><th>Motivo</th></tr></thead><tbody>';
+    f.forEach(function (r) {
+      var col = COLORES[r.accion] || '#94a3b8';
+      h += '<tr><td><b>' + esc(r.cuartel) + '</b></td><td>' + esc(r.tipo) + '<br><span style="color:#94a3b8">' + esc(r.dificultad) + '</span></td>' +
+           '<td>' + (r.peso_g == null ? '-' : (r.peso_g / 1000).toFixed(1) + ' kg') + '</td>' +
+           '<td>' + (r.demanda == null ? '-' : esc(r.demanda) + '%') + '</td><td>' + (r.dias == null ? '-' : esc(r.dias)) + '</td>' +
+           '<td><span class="pill" style="color:' + col + '">' + esc(r.accion) + '</span></td><td>' + esc(r.motivo) + '</td></tr>';
+    });
+    document.getElementById('res_diag').innerHTML = h + '</tbody></table>';
+  }
+
+  function ejecutarDiagnostico(ev) {
+    if (ev) { ev.preventDefault(); }
+    var b = document.getElementById('btn_diag'); b.disabled = true;
+    term('[FastAPI / MongoDB]: ejecutando agregación de diagnóstico...', '#38bdf8');
+    llamar('DIAGNOSTICAR', {}, function (p) {
+      b.disabled = false;
+      term('✔ ' + esc(p.msg), '#4ade80');
+      renderDiagnostico(p.filas || []);
+      cargarKpis(); cargarMapa(); cargarAlertas();
+    }, function (m) { b.disabled = false; term('✖ ERROR: ' + esc(m), '#f87171'); });
+    return false;
+  }
+
+  function ejecutarOportunidades(ev) {
+    if (ev) { ev.preventDefault(); }
+    var e = document.getElementById('val_umbral'), u = e && e.value ? e.value : 200;
+    var b = document.getElementById('btn_opo'); b.disabled = true;
+    term('[FastAPI / MongoDB]: analizando oportunidades B2B (umbral ' + esc(u + ')....'), '#38bdf8');
+    llamar('OPORTUNIDADES', { x06: u }, function (p) {
+      b.disabled = false;
+      term('✔ ' + esc(p.msg), '#4ade80');
+      var h = '<p class="box-title">Clientes corporativos detectados</p><table class="tbl"><thead><tr><th>Cliente</th><th>Volumen mensual est.</th><th>Fecha detección</th></tr></thead><tbody>';
+      (p.filas || []).forEach(function (r) { h += '<tr><td>' + esc(r.cliente) + '</td><td>' + esc(r.volumen) + ' envíos</td><td>' + esc(r.fecha) + '</td></tr>'; });
+      document.getElementById('res_opo').innerHTML = h + '</tbody></table>';
+      cargarKpis();
+    }, function (m) { b.disabled = false; term('✖ ERROR: ' + esc(m), '#f87171'); });
+    return false;
+  }
+
+  cargarKpis(); cargarAlertas(); cargarMapa();
+</script>
+
+</body>
+</html>

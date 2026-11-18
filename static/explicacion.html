@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema CDP · De PL/SQL a MongoDB</title>
+<style>
+  html, body { margin: 0; background: #0b1329; }
+  .ex { color: #e2e8f0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; padding: 28px; max-width: 1100px; margin: 0 auto; box-sizing: border-box; line-height: 1.5; }
+  .ex a.back { color: #94a3b8; font-size: .82rem; text-decoration: none; }
+  .ex a.back:hover { color: #e2e8f0; }
+  .ex h1 { font-size: 1.7rem; margin: 10px 0 4px; }
+  .ex h2 { font-size: 1.1rem; margin: 36px 0 6px; }
+  .ex p.lead { color: #94a3b8; margin: 0 0 8px; max-width: 70ch; }
+  .ex p.note { color: #94a3b8; font-size: .85rem; margin: 0 0 14px; max-width: 75ch; }
+  .flow { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+  .node { flex: 1 1 180px; background: #131f37; border: 1px solid #233554; border-radius: 12px; padding: 14px 16px; }
+  .node b { display: block; margin-bottom: 4px; }
+  .node span { color: #94a3b8; font-size: .8rem; }
+  .arrow { align-self: center; color: #38bdf8; font-size: 1.4rem; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .compare { grid-template-columns: 1fr; } .arrow { transform: rotate(90deg); width: 100%; text-align: center; } }
+  .side { background: #131f37; border: 1px solid #233554; border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .side h3 { margin: 0 0 8px; font-size: .9rem; }
+  .side.sql { border-top: 3px solid #fbbf24; }
+  .side.mongo { border-top: 3px solid #4ade80; }
+  .side pre { margin: 0; font-family: ui-monospace, Menlo, monospace; font-size: .76rem; color: #cbd5e1; white-space: pre-wrap; word-break: break-word; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .tabs button { background: #131f37; border: 1px solid #233554; color: #cbd5e1; border-radius: 8px; padding: 9px 14px; cursor: pointer; font-size: .82rem; font-weight: 600; }
+  .tabs button.on { border-color: #38bdf8; background: rgba(56,189,248,.14); color: #e0f2fe; }
+  .tabs button:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+  .why { margin-top: 14px; background: rgba(56,189,248,.1); border: 1px solid #38bdf8; border-radius: 10px; padding: 11px 14px; font-size: .85rem; color: #bae6fd; }
+  .model { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .model { grid-template-columns: 1fr; } }
+  .doc { background: #030712; border: 1px solid #1e293b; border-radius: 10px; padding: 12px 14px; font-family: ui-monospace, Menlo, monospace; font-size: .76rem; color: #cbd5e1; }
+  .doc .emb { margin: 4px 0 4px 14px; padding: 4px 10px; border-left: 3px solid #4ade80; background: rgba(74,222,128,.08); }
+  .tbls { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tbl { background: #131f37; border: 1px solid #fbbf24; color: #fde68a; border-radius: 8px; padding: 6px 12px; font-size: .78rem; font-family: ui-monospace, Menlo, monospace; }
+  .stages { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+  .stage { flex: 1 1 130px; background: #131f37; border: 1px solid #233554; border-top: 3px solid #38bdf8; border-radius: 10px; padding: 10px 12px; }
+  .stage code { color: #7dd3fc; font-size: .82rem; font-weight: 700; }
+  .stage p { margin: 4px 0 0; font-size: .76rem; color: #94a3b8; }
+  .stage .ej { color: #4ade80; font-family: ui-monospace, monospace; font-size: .7rem; margin-top: 6px; }
+  .rules { display: grid; gap: 10px; }
+  .rule { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; background: #131f37; border: 1px solid #233554; border-radius: 10px; padding: 12px 16px; }
+  .rule small { display: block; color: #94a3b8; font-size: .76rem; }
+  .pill { font-size: .72rem; font-weight: 700; padding: 3px 11px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+  .ex ol.talk { color: #cbd5e1; font-size: .88rem; padding-left: 20px; }
+  .ex ol.talk li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="ex">
+  <a class="back" href="/">← Volver al panel principal</a>
+  <h1>De PL/SQL a MongoDB</h1>
+  <p class="lead">Mismo negocio, otro modelo: la lógica que vivía dentro de Oracle (procedimientos, triggers y paquetes) pasa a una API en Python y a consultas de agregación sobre documentos.</p>
+
+  <h2>1. Arquitectura</h2>
+  <div class="flow">
+    <div class="node"><b>Navegador</b><span>Panel y terminal PDA (HTML + JavaScript)</span></div>
+    <div class="arrow">➜</div>
+    <div class="node"><b>FastAPI en Docker</b><span>Contenedor en una instancia EC2. Contiene las reglas de negocio.</span></div>
+    <div class="arrow">➜</div>
+    <div class="node"><b>MongoDB Atlas</b><span>Colecciones: cuarteles, clientes, envios, diagnostico_cuarteles, alertas_carga_cuartel</span></div>
+  </div>
+
+  <h2>2. Modelo de datos: de tablas a documentos</h2>
+  <p class="note">En Oracle un envío y sus intentos de entrega vivían en tablas separadas, unidas por una clave foránea. En MongoDB los datos que se leen juntos se guardan juntos.</p>
+  <div class="model">
+    <div class="side sql">
+      <h3>Relacional (Oracle)</h3>
+      <div class="tbls">
+        <span class="tbl">envios</span><span class="tbl">intentos_entrega</span>
+        <span class="tbl">cuarteles</span><span class="tbl">carteros</span><span class="tbl">cdp</span>
+      </div>
+      <p class="note" style="margin-top:10px">Cada consulta necesita JOIN y el trigger vigila el INSERT en otra tabla.</p>
+    </div>
+    <div class="side mongo">
+      <h3>Documental (MongoDB)</h3>
+      <div class="doc">
+        envios {<br>
+        &nbsp;&nbsp;_id, cliente_id, cuartel_id, peso_gramos, estado,
+        <div class="emb">intentos_entrega: [ { intento_nro, cartero_id, resultado, tiempo_minutos } ]</div>
+        }<br><br>
+        cuarteles {<br>
+        &nbsp;&nbsp;_id, tipo_reparto, nivel_dificultad, ubicacion (GeoJSON),
+        <div class="emb">carteros_asignados: [ { cartero_id, nombre, tipo_movilidad } ]</div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <h2>3. Qué reemplaza a qué</h2>
+  <p class="note">Elige una pieza de la lógica original para ver su equivalente. El SQL está simplificado para explicar la idea.</p>
+  <div class="tabs" id="tabs"></div>
+  <div class="compare">
+    <div class="side sql"><h3>Antes: Oracle PL/SQL</h3><pre id="c_sql"></pre></div>
+    <div class="side mongo"><h3>Ahora: Python + MongoDB</h3><pre id="c_mongo"></pre></div>
+  </div>
+  <div class="why" id="c_why"></div>
+
+  <h2>4. Anatomía del pipeline de sobrecarga</h2>
+  <p class="note">Reemplaza al trigger de alertas. Cada etapa recibe los documentos de la anterior y los transforma, igual que una línea de montaje.</p>
+  <div class="stages">
+    <div class="stage"><code>$match</code><p>Deja solo los envíos pendientes.</p><div class="ej">estado = PENDIENTE</div></div>
+    <div class="stage"><code>$group</code><p>Suma el peso por cuartel.</p><div class="ej">_id = cuartel_id<br>peso_total_g = $sum</div></div>
+    <div class="stage"><code>$match</code><p>Filtra los que pasan el límite legal.</p><div class="ej">peso_total_g &gt; 25000</div></div>
+    <div class="stage"><code>$lookup</code><p>Trae los datos del cuartel (como un JOIN).</p><div class="ej">from: cuarteles</div></div>
+    <div class="stage"><code>$unwind</code><p>Convierte el resultado del lookup en un objeto.</p><div class="ej">info_cuartel</div></div>
+    <div class="stage"><code>$match</code><p>Solo cuarteles activos que reparten a pie.</p><div class="ej">tipo_reparto = A_PIE</div></div>
+    <div class="stage" style="border-top-color:#4ade80"><code>upsert</code><p>Guarda o actualiza la alerta del día.</p><div class="ej">update_one(..., upsert=True)</div></div>
+  </div>
+
+  <h2>5. Cómo decide el diagnóstico</h2>
+  <p class="note">Primero un <code>$facet</code> calcula en una sola consulta la carga pendiente y la demanda de 90 días. Después se evalúan las reglas en este orden y gana la primera que se cumple.</p>
+  <div class="rules">
+    <div class="rule"><div><b>Más de 25 kg pendientes a pie</b><small>Pendiente no alta: la moto es posible. Pendiente alta: no queda otra que dividir el cuartel.</small></div><span class="pill" style="color:#38bdf8">MOTORIZAR / SUBDIVIDIR</span></div>
+    <div class="rule"><div><b>Demanda desde 150% del promedio comunal</b><small>Mismo criterio según la dificultad del terreno.</small></div><span class="pill" style="color:#f87171">MOTORIZAR / SUBDIVIDIR</span></div>
+    <div class="rule"><div><b>Demanda bajo 50% del promedio</b><small>Con <code>$geoNear</code> busca vecinos a menos de 3 km que puedan absorberlo sin pasar el 150% ni los 25 kg.</small></div><span class="pill" style="color:#a78bfa">FUSIONAR</span></div>
+    <div class="rule"><div><b>Ninguna se cumple</b><small>Y con menos de 2 envíos en 90 días el sistema responde sin datos.</small></div><span class="pill" style="color:#4ade80">MANTENER</span></div>
+  </div>
+
+  <h2>6. Idea para cerrar</h2>
+  <ol class="talk">
+    <li>El trigger se convirtió en una operación atómica: <code>$push</code> del intento y <code>$set</code> del estado en el mismo documento.</li>
+    <li>Los JOIN se reducen porque los datos que se consultan juntos viven juntos; donde hacen falta se usa <code>$lookup</code>.</li>
+    <li>El índice <code>2dsphere</code> permite resolver distancias en la base, algo que antes requería cálculo manual.</li>
+  </ol>
+</div>
+
+<script>
+  var ITEMS = [
+    { n: 'Registrar entrega + trigger',
+      sql: "INSERT INTO intentos_entrega\n  (envio_id, cartero_id, resultado, tiempo_min)\nVALUES (...);\n\n-- trg_devolucion_automatica\nAFTER INSERT ON intentos_entrega\nIF :NEW.resultado IN ('RECHAZADO','NO_UBICADO')\n   AND :NEW.intento_nro >= 2 THEN\n  UPDATE envios SET estado = 'DEVUELTO'\n  WHERE id = :NEW.envio_id;\nEND IF;",
+      mongo: "db.envios.update_one(\n  {\"_id\": envio_id},\n  {\n    \"$push\": {\"intentos_entrega\": intento},\n    \"$set\":  {\"estado\": nuevo_estado}\n  }\n)\n\n# nuevo_estado se calcula en Python:\n# 2do intento fallido -> DEVUELTO",
+      why: 'Una sola operación atómica reemplaza al procedimiento y al trigger: el intento queda dentro del envío.' },
+    { n: 'Alerta de sobrecarga',
+      sql: "SELECT e.cuartel_id, SUM(e.peso_gramos)\nFROM envios e JOIN cuarteles c\n  ON c.id = e.cuartel_id\nWHERE e.estado = 'PENDIENTE'\n  AND c.tipo_reparto = 'A_PIE'\nGROUP BY e.cuartel_id\nHAVING SUM(e.peso_gramos) > 25000;\n\nMERGE INTO alertas_carga_cuartel ...",
+      mongo: "[\n {\"$match\": {\"estado\": \"PENDIENTE\"}},\n {\"$group\": {\"_id\": \"$cuartel_id\",\n    \"peso_total_g\": {\"$sum\": \"$peso_gramos\"}}},\n {\"$match\": {\"peso_total_g\": {\"$gt\": 25000}}},\n {\"$lookup\": {\"from\": \"cuarteles\", ...}},\n {\"$unwind\": \"$info_cuartel\"},\n {\"$match\": {\"info_cuartel.tipo_reparto\": \"A_PIE\"}}\n]\n# MERGE -> update_one(..., upsert=True)",
+      why: 'GROUP BY + HAVING se traduce en $group + $match; el JOIN en $lookup; el MERGE en un upsert.' },
+    { n: 'Oportunidades B2B',
+      sql: "PROCEDURE detectar_oportunidades(p_umbral NUMBER) IS\nBEGIN\n  FOR c IN (SELECT * FROM clientes\n            WHERE tipo_cliente = 'EMPRESA'\n              AND volumen_mensual_est > p_umbral) LOOP\n    INSERT INTO oportunidades ...;\n  END LOOP;\nEND;",
+      mongo: "candidatos = db.clientes.find({\n  \"tipo_cliente\": \"EMPRESA\",\n  \"volumen_mensual_est\": {\"$gt\": umbral},\n  \"oportunidad_b2b.detectada\": {\"$ne\": True}\n})\n\ndb.clientes.update_one(\n  {\"_id\": cli[\"_id\"]},\n  {\"$set\": {\"oportunidad_b2b\": {...}}}\n)",
+      why: 'La oportunidad deja de ser una tabla aparte: se guarda como subdocumento dentro del cliente.' },
+    { n: 'Diagnóstico de cuarteles',
+      sql: "FUNCTION decidir_accion(...) RETURN VARCHAR2 IS\nBEGIN\n  IF tipo = 'A_PIE' AND peso > 25000 THEN ...\n  ELSIF indice >= 150 THEN ...\n  ELSIF indice <= 50 THEN ...\nEND;\n\n-- promedio comunal con AVG() y cursores\n-- vecinos con calculo de distancia manual",
+      mongo: "{\"$facet\": {\n  \"pendientes\": [ $match, $group ],\n  \"ventana_90d\": [ $match, $lookup, $group ]\n}}\n\n{\"$geoNear\": {\n  \"near\": c[\"ubicacion\"],\n  \"maxDistance\": 3000,\n  \"spherical\": True\n}}",
+      why: '$facet calcula varias métricas en una sola pasada y $geoNear encuentra vecinos usando el índice 2dsphere.' }
+  ];
+  var tabs = document.getElementById('tabs');
+  function mostrar(i) {
+    var it = ITEMS[i];
+    document.getElementById('c_sql').textContent = it.sql;
+    document.getElementById('c_mongo').textContent = it.mongo;
+    document.getElementById('c_why').textContent = it.why;
+    var bs = tabs.children;
+    for (var k = 0; k < bs.length; k++) { bs[k].className = (k === i) ? 'on' : ''; }
+  }
+  ITEMS.forEach(function (it, i) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = it.n;
+    b.onclick = function () { mostrar(i); };
+    tabs.appendChild(b);
+  });
+  mostrar(0);
+</script>
+</body>
+</html>

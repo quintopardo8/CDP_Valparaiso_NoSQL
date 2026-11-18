@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema CDP · Terminal de Terreno</title>
+<style>html, body { margin: 0; background: #0b1329; }</style>
+</head>
+<body>
+<style>
+  .pda-page {
+    min-height: 100vh; box-sizing: border-box; padding: 26px 14px 40px;
+    display: flex; flex-direction: column; align-items: center;
+    background: radial-gradient(circle at 50% -10%, #1a2c57 0%, #0b1329 62%);
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #e2e8f0;
+  }
+  .pda-back { align-self: center; width: 100%; max-width: 440px; margin-bottom: 12px; }
+  .pda-back a { color: #94a3b8; font-size: 0.8rem; text-decoration: none; }
+  .pda-back a:hover { color: #e2e8f0; }
+
+  .pda-shell {
+    width: 100%; max-width: 440px; box-sizing: border-box;
+    background: #0f1a33; border: 1px solid #243556; border-radius: 22px;
+    padding: 22px 22px 24px; box-shadow: 0 18px 50px rgba(0,0,0,0.55), 0 0 0 6px rgba(15,26,51,0.5);
+  }
+  .pda-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .pda-id { display: flex; align-items: center; gap: 12px; }
+  .pda-ico { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg,#0284c7,#38bdf8);
+             display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+  .pda-id h1 { margin: 0; font-size: 1.1rem; font-weight: 700; color: #f8fafc; }
+  .pda-id span { font-size: 0.75rem; color: #94a3b8; }
+  .pda-online { background: rgba(34,197,94,0.14); color: #4ade80; border: 1px solid #22c55e;
+                padding: 3px 9px; border-radius: 999px; font-size: 0.68rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .pda-online i { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; display: inline-block; }
+
+  .pda-group { margin-bottom: 18px; }
+  .pda-group > label { display: flex; align-items: center; gap: 8px; font-size: 0.74rem; font-weight: 700;
+                       color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+  .step { width: 20px; height: 20px; border-radius: 50%; background: #1e3a5f; color: #7dd3fc;
+          display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; }
+  .pda-ctrl { width: 100%; padding: 12px; border-radius: 10px; background: #14213f; border: 1px solid #2b3d62;
+              color: #fff; font-size: 0.95rem; box-sizing: border-box; }
+  .pda-ctrl:focus { outline: none; border-color: #38bdf8; }
+
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .seg button { background: #14213f; border: 1.5px solid #2b3d62; color: #cbd5e1; border-radius: 10px;
+                padding: 10px 4px; cursor: pointer; font-size: 0.8rem; font-weight: 700; line-height: 1.25; }
+  .seg button small { display: block; font-weight: 400; font-size: 0.66rem; color: #94a3b8; margin-top: 2px; }
+  .seg button.on-NO_UBICADO { border-color: #fbbf24; background: rgba(251,191,36,0.12); color: #fde68a; }
+  .seg button.on-RECHAZADO  { border-color: #f87171; background: rgba(248,113,113,0.12); color: #fecaca; }
+  .seg button.on-ENTREGADO  { border-color: #4ade80; background: rgba(74,222,128,0.12);  color: #bbf7d0; }
+
+  .min-row { display: flex; gap: 8px; }
+  .min-row button { width: 48px; border-radius: 10px; background: #14213f; border: 1px solid #2b3d62;
+                    color: #e2e8f0; font-size: 1.2rem; cursor: pointer; }
+  .min-row input { text-align: center; }
+
+  .btn-submit-pda { width: 100%; background: linear-gradient(135deg,#0284c7,#0369a1); color: #fff; padding: 15px;
+                    font-size: 1rem; font-weight: 800; border-radius: 12px; border: none; cursor: pointer;
+                    margin-top: 6px; box-shadow: 0 6px 18px rgba(2,132,199,0.35); transition: 0.15s; }
+  .btn-submit-pda:hover { filter: brightness(1.08); }
+  .btn-submit-pda:disabled { opacity: 0.6; cursor: wait; }
+
+  .pda-feedback { margin-top: 16px; background: #060b18; border: 1px solid #1e293b; border-radius: 10px;
+                  padding: 11px 13px; font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem;
+                  color: #38bdf8; min-height: 36px; line-height: 1.5; }
+
+  .res-card { display: none; margin-top: 16px; background: #14213f; border: 2px solid #334155; border-radius: 14px; padding: 15px; }
+  .res-head { display: flex; justify-content: space-between; align-items: center; }
+  .res-head .envio-id { font-size: 0.78rem; font-weight: 700; color: #94a3b8; letter-spacing: 0.05em; }
+  .badge { font-size: 0.9rem; font-weight: 800; padding: 4px 13px; border-radius: 999px; border: 2px solid currentColor; }
+  .res-sub { margin: 8px 0 10px; font-size: 0.88rem; color: #cbd5e1; }
+  .tl-item { display: flex; align-items: center; gap: 10px; font-size: 0.83rem; padding: 6px 0; border-top: 1px solid #22304f; }
+  .tl-item .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .trigger-note { margin-top: 11px; padding: 10px 12px; border-radius: 9px; background: rgba(56,189,248,0.12);
+                  border: 1px solid #38bdf8; color: #bae6fd; font-size: 0.8rem; line-height: 1.45; }
+
+  .sesion-box { margin-top: 16px; }
+  .sesion-box .titulo { font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
+  .sesion-item { display: flex; justify-content: space-between; gap: 8px; font-size: 0.78rem; padding: 6px 0; border-top: 1px solid #22304f; color: #cbd5e1; }
+  .sesion-item .est { font-weight: 700; }
+</style>
+
+<div class="pda-page">
+  <div class="pda-back"><a href="/">← Volver al panel principal</a></div>
+  <div class="pda-shell">
+    <div class="pda-bar">
+      <div class="pda-id">
+        <div class="pda-ico">📲</div>
+        <div>
+          <h1>Terminal de Terreno</h1>
+          <span>Registro de visitas FastAPI</span>
+        </div>
+      </div>
+      <span class="pda-online"><i></i>EN LÍNEA</span>
+    </div>
+
+    <div class="pda-group">
+      <label><span class="step">1</span>Cartero</label>
+      <select id="ctrl_cartero" class="pda-ctrl" onchange="cargarEnvios()">
+        <option value="3">3 - Pedro Alarcón (Cuartel 16)</option>
+        <option value="1">1 - Juan Pérez (Cuartel 9)</option>
+        <option value="2">2 - María Soto (Cuartel 15)</option>
+        <option value="5">5 - Luis Fuentes (Cuartel 19)</option>
+        <option value="6">6 - Andrea Ramírez (Cuartel 23)</option>
+        <option value="7">7 - Diego Morales (Cuartel 32)</option>
+        <option value="9">9 - Ricardo Silva (Cuartel 26)</option>
+        <option value="10">10 - Camila Torres (Cuartel 48)</option>
+        <option value="11">11 - Hugo Castillo (Cuartel 54, moto)</option>
+        <option value="12">12 - Paula Vidal (Cuartel 55, moto)</option>
+        <option value="13">13 - Sergio Bravo (Cuartel 56, moto)</option>
+      </select>
+    </div>
+
+    <div class="pda-group">
+      <label><span class="step">2</span>Envío pendiente</label>
+      <select id="ctrl_envio" class="pda-ctrl"><option value="">Cargando...</option></select>
+    </div>
+
+    <div class="pda-group">
+      <label><span class="step">3</span>Resultado de la visita</label>
+      <input type="hidden" id="ctrl_res" value="NO_UBICADO">
+      <div class="seg" id="seg_res">
+        <button type="button" data-v="NO_UBICADO" class="on-NO_UBICADO" onclick="elegirResultado('NO_UBICADO')">No ubicado<small>Ausente</small></button>
+        <button type="button" data-v="RECHAZADO" onclick="elegirResultado('RECHAZADO')">Rechazado<small>En domicilio</small></button>
+        <button type="button" data-v="ENTREGADO" onclick="elegirResultado('ENTREGADO')">Entregado<small>Conforme</small></button>
+      </div>
+    </div>
+
+    <div class="pda-group">
+      <label><span class="step">4</span>Tiempo empleado (minutos)</label>
+      <div class="min-row">
+        <button type="button" onclick="ajustarMin(-1)">−</button>
+        <input type="number" id="ctrl_min" class="pda-ctrl" value="14" min="1"
+               onkeydown="if (event.key === 'Enter') { event.preventDefault(); }">
+        <button type="button" onclick="ajustarMin(1)">+</button>
+      </div>
+    </div>
+
+    <button type="button" id="btn_registrar" class="btn-submit-pda" onclick="registrarVisita(event)">REGISTRAR VISITA</button>
+
+    <div class="pda-feedback" id="pda_feedback">Esperando registro de terreno...</div>
+
+    <div class="res-card" id="pda_resultado"></div>
+
+    <div class="sesion-box" id="pda_sesion" style="display:none;">
+      <div class="titulo">Registros de esta sesión</div>
+      <div id="pda_sesion_lista"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/api.js"></script>
+<script>
+  var COL = { PENDIENTE: "#fbbf24", ENTREGADO: "#4ade80", DEVUELTO: "#f87171" };
+  var TXT_ESTADO = {
+    PENDIENTE: "Sigue pendiente.",
+    ENTREGADO: "Entrega completada.",
+    DEVUELTO:  "Devuelto al remitente por intentos agotados."
+  };
+  var REGISTROS = [];
+
+  function esc(t) {
+    return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function fb(html, color) {
+    var o = document.getElementById("pda_feedback");
+    if (o) { o.innerHTML = html; o.style.color = color; }
+  }
+
+  function elegirResultado(v) {
+    document.getElementById("ctrl_res").value = v;
+    var bs = document.querySelectorAll("#seg_res button");
+    for (var i = 0; i < bs.length; i++) {
+      bs[i].className = (bs[i].getAttribute("data-v") === v) ? "on-" + v : "";
+    }
+  }
+  function ajustarMin(d) {
+    var e = document.getElementById("ctrl_min");
+    var n = parseInt(e.value, 10); if (isNaN(n)) { n = 10; }
+    e.value = Math.max(1, n + d);
+  }
+
+  function cargarEnvios() {
+    var cart = document.getElementById("ctrl_cartero").value;
+    var sel = document.getElementById("ctrl_envio");
+    sel.innerHTML = '<option value="">Cargando...</option>';
+    llamar("LISTAR_ENVIOS", { x02: cart }, function (p) {
+      var filas = p.filas || [];
+      if (filas.length === 0) {
+        sel.innerHTML = '<option value="">Sin envíos pendientes</option>';
+        return;
+      }
+      var h = '';
+      filas.forEach(function (f) {
+        var detalle = "Envío " + f.envio + " · " + f.tipo + " · " + (f.peso_g / 1000).toFixed(1) + " kg";
+        h += '<option value="' + esc(f.envio) + '">' + esc(detalle) + '</option>';
+      });
+      sel.innerHTML = h;
+    }, function (msg) {
+      sel.innerHTML = '<option value="">Error al cargar</option>';
+      fb("✖ " + esc(msg), "#f87171");
+    });
+  }
+
+  function mostrarResultado(p, envio) {
+    var card = document.getElementById("pda_resultado");
+    var col = COL[p.estado] || "#94a3b8";
+    var h = '<div class="res-head"><span class="envio-id">ENVÍO ' + esc(envio) + '</span>' +
+            '<span class="badge" style="color:' + col + '">' + esc(p.estado) + '</span></div>' +
+            '<div class="res-sub">' + esc(TXT_ESTADO[p.estado] || "") + '</div>';
+    (p.historial || []).forEach(function (i) {
+      var c = (i.resultado === "ENTREGADO") ? "#4ade80" : "#f87171";
+      h += '<div class="tl-item"><span class="dot" style="background:' + c + '"></span>' +
+           '<span><b>Intento ' + esc(i.intento) + '</b> · ' + esc(i.resultado) + ' · ' + esc(i.min) + ' min</span></div>';
+    });
+    if (p.estado === "DEVUELTO") {
+      h += '<div class="trigger-note">⚡ Estado actualizado mediante servicio backend NoSQL (lógica de intentos superados).</div>';
+    }
+    card.style.display = "block";
+    card.style.borderColor = col;
+    card.innerHTML = h;
+    card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function agregarRegistro(envio, cart, res, estado) {
+    REGISTROS.unshift({ hora: new Date().toLocaleTimeString("es-CL"), envio: envio, cart: cart, res: res, estado: estado });
+    if (REGISTROS.length > 6) { REGISTROS.pop(); }
+    var h = "";
+    REGISTROS.forEach(function (r) {
+      h += '<div class="sesion-item"><span>' + esc(r.hora) + ' · Envío ' + esc(r.envio) + ' · ' + esc(r.res) + '</span>' +
+           '<span class="est" style="color:' + (COL[r.estado] || "#94a3b8") + '">' + esc(r.estado) + '</span></div>';
+    });
+    document.getElementById("pda_sesion_lista").innerHTML = h;
+    document.getElementById("pda_sesion").style.display = "block";
+  }
+
+  function registrarVisita(ev) {
+    if (ev) { ev.preventDefault(); }
+    var e = document.getElementById("ctrl_envio").value;
+    var c = document.getElementById("ctrl_cartero").value;
+    var r = document.getElementById("ctrl_res").value;
+    var m = document.getElementById("ctrl_min").value;
+    var btn = document.getElementById("btn_registrar");
+
+    if (!e) { fb("✖ Selecciona un envío válido.", "#f87171"); return false; }
+
+    btn.disabled = true;
+    fb("[FastAPI]: registrando visita...", "#38bdf8");
+
+    llamar("REGISTRAR_ENTREGA", { x02: e, x03: c, x04: r, x05: m }, function (p) {
+      btn.disabled = false;
+      fb("✔ " + esc(p.msg) + " [" + esc(r) + "]", "#4ade80");
+      mostrarResultado(p, e);
+      agregarRegistro(e, c, r, p.estado);
+      cargarEnvios();
+    }, function (msg) {
+      btn.disabled = false;
+      fb("✖ ERROR: " + esc(msg), "#f87171");
+    });
+    return false;
+  }
+
+  cargarEnvios();
+</script>
+
+</body>
+</html>

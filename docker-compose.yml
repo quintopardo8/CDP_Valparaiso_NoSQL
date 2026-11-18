@@ -1,0 +1,10 @@
+services:
+  cdp-api:
+    build: .
+    container_name: cdp_valparaiso_api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URI=mongodb+srv://separdoi_db_user:*********@cdpvalparaiso.0ypeamv.mongodb.net/
+      - DB_NAME=CDPValparaiso
